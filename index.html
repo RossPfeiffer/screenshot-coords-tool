@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot Coordinates Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .screenshot-container {
+            position: relative;
+            display: inline-block;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px auto;
+            display: block;
+            max-width: 100%;
+        }
+        .screenshot {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            cursor: crosshair;
+        }
+        .crosshair {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        .crosshair-horizontal {
+            position: absolute;
+            width: 20px;
+            height: 2px;
+            background: #ff0000;
+            top: -1px;
+            left: -10px;
+            box-shadow: 0 0 4px rgba(255,0,0,0.8);
+        }
+        .crosshair-vertical {
+            position: absolute;
+            width: 2px;
+            height: 20px;
+            background: #ff0000;
+            top: -10px;
+            left: -1px;
+            box-shadow: 0 0 4px rgba(255,0,0,0.8);
+        }
+        .crosshair-extended-h {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background: rgba(255,0,0,0.3);
+            top: 0;
+            left: 0;
+            z-index: 5;
+        }
+        .crosshair-extended-v {
+            position: absolute;
+            width: 1px;
+            height: 100%;
+            background: rgba(255,0,0,0.3);
+            top: 0;
+            left: 0;
+            z-index: 5;
+        }
+        .coordinates {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            z-index: 1000;
+            min-width: 200px;
+            border: 2px solid #333;
+        }
+        .instructions {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #0c5460;
+        }
+        .instructions p {
+            margin: 5px 0;
+            color: #0c5460;
+        }
+        .copy-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            font-size: 12px;
+        }
+        .copy-btn:hover {
+            background: #0056b3;
+        }
+        .copy-btn.copied {
+            background: #28a745;
+        }
+        .status {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-family: monospace;
+            z-index: 1000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Screenshot Coordinates Tool</h1>
+        
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <p>• Click anywhere on the image to get pixel coordinates</p>
+            <p>• Red crosshairs will appear at your click position</p>
+            <p>• Coordinates will appear in the top-right corner</p>
+            <p>• Use these coordinates for automation commands like <code>[!click x,y]</code></p>
+            <p>• Press Ctrl+C to copy coordinates to clipboard</p>
+            <p>• Crosshairs are made with div elements, not cursor!</p>
+        </div>
+        
+        <div class="screenshot-container" id="screenshotContainer">
+            <img src="https://i.ibb.co/HDnPZ0mL/538b110aece8.png" alt="Screenshot" class="screenshot" id="screenshot" width="1920" height="1080">
+            
+            <div class="crosshair" id="crosshair">
+                <div class="crosshair-extended-h"></div>
+                <div class="crosshair-extended-v"></div>
+                <div class="crosshair-horizontal"></div>
+                <div class="crosshair-vertical"></div>
+            </div>
+        </div>
+        
+        <div class="coordinates" id="coordinates" style="display: none;">
+            <div><strong>Coordinates:</strong></div>
+            <div>X: <span id="xCoord">0</span></div>
+            <div>Y: <span id="yCoord">0</span></div>
+            <hr style="margin: 10px 0; border-color: #555;">
+            <div><strong>Commands:</strong></div>
+            <div>Left: <span id="clickCommand">[!click:0,0]</span></div>
+            <div>Right: <span id="rclickCommand">[!rclick:0,0]</span></div>
+            <div>Middle: <span id="mclickCommand">[!mclick:0,0]</span></div>
+            <hr style="margin: 10px 0; border-color: #555;">
+            <button class="copy-btn" onclick="copyCoordinates('left')">Copy Left</button>
+            <button class="copy-btn" onclick="copyCoordinates('right')">Copy Right</button>
+            <button class="copy-btn" onclick="copyCoordinates('middle')">Copy Middle</button>
+        </div>
+        
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const screenshot = document.getElementById('screenshot');
+        const crosshair = document.getElementById('crosshair');
+        const coordinates = document.getElementById('coordinates');
+        const xCoord = document.getElementById('xCoord');
+        const yCoord = document.getElementById('yCoord');
+        const clickCommand = document.getElementById('clickCommand');
+        const rclickCommand = document.getElementById('rclickCommand');
+        const mclickCommand = document.getElementById('mclickCommand');
+        const status = document.getElementById('status');
+        
+        let isMouseOver = false;
+        let currentX = 0;
+        let currentY = 0;
+        
+        function showStatus(message, type = 'info') {
+            status.textContent = message;
+            status.style.display = 'block';
+            status.style.background = type === 'success' ? 'rgba(40,167,69,0.9)' : 'rgba(0,0,0,0.8)';
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 2000);
+        }
+        
+        function updateCrosshair(x, y) {
+            crosshair.style.left = x + 'px';
+            crosshair.style.top = y + 'px';
+            crosshair.style.display = 'block';
+        }
+        
+        function updateCoordinates(x, y) {
+            xCoord.textContent = x;
+            yCoord.textContent = y;
+            clickCommand.textContent = `[!click:${x},${y}]`;
+            rclickCommand.textContent = `[!rclick:${x},${y}]`;
+            mclickCommand.textContent = `[!mclick:${x},${y}]`;
+        }
+        
+        screenshot.addEventListener('click', function(e) {
+            const rect = screenshot.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            const scaleX = 1920 / rect.width;
+            const scaleY = 1080 / rect.height;
+            const x = Math.round(clickX * scaleX);
+            const y = Math.round(clickY * scaleY);
+            
+            updateCoordinates(x, y);
+            updateCrosshair(clickX, clickY);
+            coordinates.style.display = 'block';
+            currentX = x;
+            currentY = y;
+            
+            console.log(`Clicked at: ${x}, ${y} (scaled from ${clickX}, ${clickY})`);
+            showStatus(`Clicked at (${x}, ${y})`, 'success');
+        });
+        
+        screenshot.addEventListener('mousemove', function(e) {
+            if (isMouseOver) {
+                const rect = screenshot.getBoundingClientRect();
+                const moveX = e.clientX - rect.left;
+                const moveY = e.clientY - rect.top;
+                
+                const scaleX = 1920 / rect.width;
+                const scaleY = 1080 / rect.height;
+                const x = Math.round(moveX * scaleX);
+                const y = Math.round(moveY * scaleY);
+                
+                updateCoordinates(x, y);
+                updateCrosshair(moveX, moveY);
+                coordinates.style.display = 'block';
+            }
+        });
+        
+        screenshot.addEventListener('mouseenter', function() {
+            isMouseOver = true;
+            coordinates.style.display = 'block';
+        });
+        
+        screenshot.addEventListener('mouseleave', function() {
+            isMouseOver = false;
+            crosshair.style.display = 'none';
+        });
+        
+        function copyCoordinates(type) {
+            let text;
+            if (type === 'left') {
+                text = clickCommand.textContent;
+            } else if (type === 'right') {
+                text = rclickCommand.textContent;
+            } else if (type === 'middle') {
+                text = mclickCommand.textContent;
+            } else {
+                text = clickCommand.textContent;
+            }
+            
+            navigator.clipboard.writeText(text).then(function() {
+                const buttons = document.querySelectorAll('.copy-btn');
+                buttons.forEach(btn => {
+                    btn.classList.remove('copied');
+                    if (btn.textContent.includes(type.charAt(0).toUpperCase() + type.slice(1))) {
+                        const originalText = btn.textContent;
+                        btn.textContent = 'Copied!';
+                        btn.classList.add('copied');
+                        setTimeout(() => {
+                            btn.textContent = originalText;
+                            btn.classList.remove('copied');
+                        }, 1000);
+                    }
+                });
+                showStatus(`${type.charAt(0).toUpperCase() + type.slice(1)} click command copied!`, 'success');
+            }).catch(function(err) {
+                showStatus('Failed to copy to clipboard', 'error');
+                console.error('Clipboard error:', err);
+            });
+        }
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'c' && coordinates.style.display !== 'none') {
+                e.preventDefault();
+                copyCoordinates('left');
+            }
+        });
+        
+        console.log('🎯 Screenshot coordinates tool loaded!');
+        console.log('📐 Image dimensions:', 1920, 'x', 1080);
+    </script>
+</body>
+</html>
